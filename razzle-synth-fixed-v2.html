@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Razzle Dazzle</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080810;--bg2:#0f0f1a;--bg3:#161624;--bg4:#1e1e30;--bg5:#262638;
+  --b1:rgba(255,255,255,0.07);--b2:rgba(255,255,255,0.13);--b3:rgba(255,255,255,0.22);
+  --tx:#e4e4f4;--tx2:#7878a0;--tx3:#4a4a6a;
+  --ac:#c8f060;--ac-dim:rgba(200,240,96,0.12);
+  --pl:#60f0c8;--pl-dim:rgba(96,240,200,0.12);
+  --dn:#f06080;--wn:#f0b060;--pu:#b060f0;
+}
+body{background:var(--bg);color:var(--tx);font-family:'Space Mono',monospace;font-size:13px;min-height:100vh}
+button, .drag-handle { touch-action: manipulation; }
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.025) 2px,rgba(0,0,0,0.025) 4px);pointer-events:none;z-index:9999}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;padding:16px 24px;border-bottom:1px solid var(--b1);gap:14px;background:var(--bg);position:sticky;top:0;z-index:200}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;letter-spacing:6px;color:var(--ac);text-transform:uppercase}
+.logo span{color:var(--tx3);font-weight:400}
+.hright{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn{background:var(--bg3);border:1px solid var(--b2);color:var(--tx2);padding:6px 13px;border-radius:6px;cursor:pointer;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:1px;text-transform:uppercase;transition:all .15s;white-space:nowrap}
+.btn:hover{border-color:var(--b3);color:var(--tx)}
+.btn.green{background:var(--ac);border-color:var(--ac);color:#080810;font-weight:700}
+.btn.green:hover{opacity:.88}
+.btn.red{border-color:rgba(240,96,128,.3);color:var(--dn);background:transparent}
+.btn.red:hover{background:rgba(240,96,128,.1);border-color:var(--dn)}
+#file-input{display:none}
+
+/* ── MAIN ── */
+main{padding:24px;max-width:880px;margin:0 auto}
+.slbl{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--tx3);margin-bottom:12px;padding-left:2px}
+#sound-grid{display:flex;flex-direction:column;gap:6px;min-height:60px}
+.empty-hint{border:1px dashed var(--b2);border-radius:10px;padding:52px 24px;text-align:center;color:var(--tx3);line-height:2.2}
+.empty-hint big{display:block;font-family:'Syne',sans-serif;font-size:20px;color:var(--tx2);letter-spacing:2px;margin-bottom:6px}
+
+/* ── SOUND ROW ── */
+.srow{display:flex;align-items:stretch;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;overflow:visible;transition:border-color .15s,opacity .15s,transform .15s;position:relative;cursor:default}
+.srow:hover{border-color:var(--b2)}
+.srow.playing{border-color:rgba(96,240,200,.4)}
+.srow.drag-over{border-color:var(--ac);background:rgba(200,240,96,.05)}
+.srow.dragging{opacity:.4;transform:scale(.99)}
+
+/* DRAG HANDLE */
+.drag-handle{width:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:grab;flex-shrink:0;border-right:1px solid var(--b1);border-radius:10px 0 0 10px;transition:background .12s}
+.drag-handle:hover{background:rgba(255,255,255,.04)}
+.drag-handle:active{cursor:grabbing}
+.dh-dot{width:3px;height:3px;border-radius:50%;background:var(--tx3)}
+.srow:hover .dh-dot{background:var(--tx2)}
+
+/* PLAY BUTTON */
+.pbtn{flex:1;display:flex;align-items:center;gap:13px;padding:0 16px;height:60px;background:transparent;border:none;border-right:1px solid var(--b1);cursor:pointer;color:var(--tx);font-family:inherit;text-align:left;transition:background .12s;position:relative;overflow:hidden}
+.pbtn:hover{background:rgba(255,255,255,.025)}
+.pbtn:active{background:rgba(255,255,255,.05)}
+.progress-fill{position:absolute;left:0;top:0;bottom:0;width:0%;background:var(--pl-dim);pointer-events:none;transition:width .05s linear}
+.picon{width:32px;height:32px;border-radius:50%;border:1.5px solid var(--b2);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .15s;position:relative;z-index:1}
+.pbtn:hover .picon{border-color:var(--ac);color:var(--ac)}
+.srow.playing .picon{border-color:var(--pl);color:var(--pl)}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(96,240,200,.35)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.srow.playing .picon{animation:ring 1.6s infinite}
+.cdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;position:relative;z-index:1}
+.sinfo{display:flex;flex-direction:column;gap:3px;position:relative;z-index:1;overflow:hidden;flex:1;min-width:0}
+.sname{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.smeta{font-size:10px;color:var(--tx3);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.stag{background:var(--bg4);border:1px solid var(--b1);border-radius:3px;padding:1px 5px;font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.stag.t-loop{color:var(--pl);border-color:rgba(96,240,200,.25)}
+.stag.t-fade{color:var(--wn);border-color:rgba(240,176,96,.25)}
+.stag.t-pitch{color:var(--pu);border-color:rgba(176,96,240,.25)}
+.stag.t-trim{color:var(--ac);border-color:rgba(200,240,96,.25)}
+.stag.t-next{color:#60b0f0;border-color:rgba(96,176,240,.25)}
+.vu{display:flex;gap:2px;align-items:flex-end;height:22px;margin-left:auto;padding-right:6px;position:relative;z-index:1;flex-shrink:0}
+.vbar{width:3px;background:var(--b1);border-radius:2px;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+.vfill{width:100%;background:var(--pl);border-radius:2px;height:5%;transition:height .06s}
+
+/* THREE DOT */
+.mbtn{width:46px;background:transparent;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3.5px;color:var(--tx3);border-radius:0 10px 10px 0;transition:all .12s;flex-shrink:0}
+.mbtn:hover{background:rgba(255,255,255,.04);color:var(--tx2)}
+.mbtn.open{background:rgba(255,255,255,.06);color:var(--tx)}
+.dot3{width:4px;height:4px;border-radius:50%;background:currentColor}
+
+/* ── DROPDOWN ── */
+.dropdown{position:absolute;right:0;top:calc(100% + 7px);width:320px;background:var(--bg3);border:1px solid var(--b2);border-radius:10px;z-index:600;display:none;box-shadow:0 20px 60px rgba(0,0,0,.7);max-height:80vh;overflow-y:auto}
+.dropdown.open{display:block}
+@keyframes ddopen{from{opacity:0;transform:translateY(-5px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.dropdown.open{animation:ddopen .14s ease}
+.ddhd{padding:11px 14px;border-bottom:1px solid var(--b1);display:flex;gap:8px;align-items:center}
+.dd-name{flex:1;background:var(--bg4);border:1px solid var(--b2);color:var(--tx);padding:6px 10px;border-radius:5px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;outline:none;letter-spacing:.5px}
+.dd-name:focus{border-color:var(--ac)}
+.ddbody{padding:13px 14px;display:flex;flex-direction:column;gap:11px}
+.ddr{display:flex;flex-direction:column;gap:5px}
+.ddrh{display:flex;justify-content:space-between;align-items:center}
+.ddlbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--tx3)}
+.ddval{font-size:11px;color:var(--ac);font-weight:700}
+.ddsl{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--bg4);border-radius:2px;outline:none;cursor:pointer}
+.ddsl::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ac);cursor:pointer;border:2px solid var(--bg)}
+.ddhr{height:1px;background:var(--b1);margin:2px 0}
+.ddtoggles{display:flex;gap:6px;flex-wrap:wrap}
+.ddtog{background:var(--bg4);border:1px solid var(--b2);color:var(--tx2);padding:5px 11px;border-radius:5px;cursor:pointer;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all .12s}
+.ddtog:hover{border-color:var(--b3);color:var(--tx)}
+.ddtog.on{background:var(--ac-dim);border-color:var(--ac);color:var(--ac)}
+.ddtog.on.lp{background:var(--pl-dim);border-color:var(--pl);color:var(--pl)}
+.ddft{padding:10px 14px;border-top:1px solid var(--b1);display:flex;gap:6px}
+.ddfbtn{background:var(--bg4);border:1px solid var(--b2);color:var(--tx2);padding:6px 12px;border-radius:5px;cursor:pointer;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;transition:all .12s}
+.ddfbtn:hover{border-color:var(--b3);color:var(--tx)}
+.ddfbtn.fp{border-color:rgba(96,240,200,.3);color:var(--pl)}
+.ddfbtn.fp:hover{background:var(--pl-dim)}
+.ddfbtn.fd{border-color:rgba(240,96,128,.25);color:var(--dn);margin-left:auto}
+.ddfbtn.fd:hover{background:rgba(240,96,128,.1)}
+
+/* ── PLAY-NEXT SELECTOR ── */
+.pn-select{width:100%;background:var(--bg4);border:1px solid var(--b2);color:var(--tx);padding:6px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:11px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237878a0'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.pn-select:focus{border-color:var(--ac)}
+.pn-select option{background:#1e1e30}
+
+/* ── TRIM EDITOR ── */
+.trim-wrap{position:relative;height:54px;border-radius:6px;overflow:hidden;cursor:crosshair;background:var(--bg4);border:1px solid var(--b2)}
+.trim-canvas{display:block;width:100%;height:100%}
+.trim-handle{position:absolute;top:0;bottom:0;width:12px;cursor:ew-resize;display:flex;align-items:center;justify-content:center;z-index:10}
+.trim-handle::after{content:'';display:block;width:2px;height:70%;border-radius:1px;background:var(--ac)}
+.trim-handle.left{left:0;background:linear-gradient(90deg,rgba(200,240,96,.25),transparent)}
+.trim-handle.right{right:0;background:linear-gradient(270deg,rgba(200,240,96,.25),transparent)}
+.trim-region{position:absolute;top:0;bottom:0;background:rgba(200,240,96,.08);border-left:2px solid var(--ac);border-right:2px solid var(--ac);pointer-events:none}
+.trim-time-row{display:flex;justify-content:space-between;margin-top:4px}
+.trim-time{font-size:10px;color:var(--tx2)}
+
+/* ── QUEUE ROW AT TOP ── */
+.queue-banner{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--bg2);border:1px solid var(--b1);border-radius:10px;margin-bottom:18px;font-size:11px;color:var(--tx3);letter-spacing:1px}
+.queue-banner strong{color:var(--tx);font-family:'Syne',sans-serif;font-size:12px}
+.queue-badge{background:var(--bg4);border:1px solid var(--b2);border-radius:4px;padding:2px 8px;font-size:10px;color:var(--tx2);letter-spacing:1px;text-transform:uppercase}
+
+/* ── DROPZONE ── */
+#dzone{position:fixed;inset:0;background:rgba(200,240,96,.06);border:2px dashed var(--ac);display:none;align-items:center;justify-content:center;z-index:9000;pointer-events:none}
+#dzone.on{display:flex}
+#dzone span{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;letter-spacing:8px;color:var(--ac);text-transform:uppercase}
+
+/* ── DRAG GHOST ── */
+#drag-ghost{position:fixed;pointer-events:none;z-index:10000;opacity:.85;padding:8px 16px;background:var(--bg3);border:1px solid var(--ac);border-radius:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--ac);display:none;white-space:nowrap}
+
+@keyframes rowin{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.srow{animation:rowin .18s ease}
+</style>
+</head>
+<body>
+<div id="dzone"><span>Drop Audio Files</span></div>
+<div id="drag-ghost"></div>
+
+<header>
+  <div class="logo">Razzle <span>//</span> Dazzle</div>
+  <div class="hright">
+    <button class="btn red" onclick="stopAll()">■ Stop All</button>
+    <label class="btn green" for="file-input">+ Add Sound</label>
+    <input type="file" id="file-input" accept="audio/*" multiple onchange="loadFiles(this.files)">
+  </div>
+</header>
+
+<main>
+  <div class="queue-banner" id="queue-banner">
+    <span class="queue-badge">Up Next</span>
+    <span id="qnext-label">— no sounds loaded —</span>
+  </div>
+  <div class="slbl">Sounds — drag <span style="opacity:.4">⠿</span> to reorder</div>
+  <div id="sound-grid">
+    <div class="empty-hint"><big>No sounds yet</big>Click <b>+ Add Sound</b> or drag audio files onto this page</div>
+  </div>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+let audioCtx = null;
+let sounds = [];
+let openId = null;
+let dragSrcId = null;
+
+const COLORS = ['#c8f060','#60f0c8','#f0b060','#f06080','#b060f0','#60b0f0','#f060b0','#60f090'];
+
+function ctx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state !== 'running') {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function mkSound(name, buffer, color) {
+  return {
+    id: Date.now() + Math.random(),
+    name, buffer, color,
+    volume: 1, loop: false, fadeIn: 0, fadeOut: 0, pitch: 1,
+    trimStart: 0, trimEnd: buffer ? buffer.duration : 0,
+    playNextId: null,          // id of sound to play after this one (null = stop)
+    source: null, gainNode: null, analyser: null,
+    isPlaying: false, startTime: 0
+  };
+}
+
+/* ═══════════════════════════════════════════
+   FILE LOADING
+═══════════════════════════════════════════ */
+function loadFiles(files) {
+  Array.from(files).forEach(f => {
+    const r = new FileReader();
+    r.onload = e => {
+      ctx().decodeAudioData(e.target.result, buf => {
+        const s = mkSound(f.name.replace(/\.[^.]+$/, ''), buf, COLORS[sounds.length % COLORS.length]);
+        sounds.push(s);
+        renderGrid();
+        updateQueueBanner();
+      });
+    };
+    r.readAsArrayBuffer(f);
+  });
+  document.getElementById('file-input').value = '';
+}
+
+/* ═══════════════════════════════════════════
+   PLAYBACK
+═══════════════════════════════════════════ */
+function playSound(id) {
+  const s = sounds.find(x => x.id === id);
+  if (!s) return;
+  if (s.isPlaying) { stopSound(id); return; }
+  stopSound(id);
+  const ac = ctx();
+
+  const offset = s.trimStart;
+  const duration = (s.trimEnd - s.trimStart) / s.pitch;
+
+  const src = ac.createBufferSource();
+  src.buffer = s.buffer;
+  src.loop = s.loop;
+  src.playbackRate.value = s.pitch;
+
+  const gain = ac.createGain();
+  gain.gain.value = s.volume;
+  if (s.fadeIn > 0) {
+    gain.gain.setValueAtTime(0, ac.currentTime);
+    gain.gain.linearRampToValueAtTime(s.volume, ac.currentTime + s.fadeIn);
+  }
+  if (s.fadeOut > 0 && !s.loop) {
+    const fs = ac.currentTime + Math.max(0, duration - s.fadeOut);
+    gain.gain.setValueAtTime(s.volume, fs);
+    gain.gain.linearRampToValueAtTime(0, fs + s.fadeOut);
+  }
+
+  const analyser = ac.createAnalyser();
+  analyser.fftSize = 64;
+  src.connect(gain); gain.connect(analyser); analyser.connect(ac.destination);
+
+  s.source = src; s.gainNode = gain; s.analyser = analyser;
+  s.isPlaying = true; s.startTime = ac.currentTime;
+
+  src.onended = () => {
+    if (!s.isPlaying) return;
+    s.isPlaying = false; s.source = null;
+    refreshRow(id);
+    updateQueueBanner();
+    // Play next if set
+    if (s.playNextId && !s.loop) {
+      setTimeout(() => playSound(s.playNextId), 50);
+    }
+  };
+
+  src.start(0, offset, s.loop ? undefined : duration);
+  refreshRow(id);
+  updateQueueBanner();
+  tickVU(id);
+}
+
+function stopSound(id) {
+  const s = sounds.find(x => x.id === id);
+  if (!s) return;
+  if (s.source) { try { s.source.stop(); } catch(e){} s.source = null; }
+  s.isPlaying = false;
+  refreshRow(id);
+  updateQueueBanner();
+}
+
+function stopAll() { sounds.forEach(s => stopSound(s.id)); }
+
+function tickVU(id) {
+  const s = sounds.find(x => x.id === id);
+  if (!s || !s.isPlaying || !s.analyser) return;
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (!row) return;
+  const data = new Uint8Array(s.analyser.frequencyBinCount);
+  s.analyser.getByteFrequencyData(data);
+  row.querySelectorAll('.vfill').forEach((b, i) => {
+    const v = data[Math.floor(i * data.length / 5)] || 0;
+    b.style.height = Math.max(6, (v / 255) * 100) + '%';
+    b.style.opacity = v > 8 ? 1 : 0.15;
+  });
+  const trimDur = (s.trimEnd - s.trimStart) / s.pitch;
+  const el = ac() && (audioCtx.currentTime - s.startTime) || 0;
+  const pct = s.loop ? (el % trimDur) / trimDur : Math.min(1, el / trimDur);
+  const pf = row.querySelector('.progress-fill');
+  if (pf) pf.style.width = (pct * 100) + '%';
+  requestAnimationFrame(() => tickVU(id));
+}
+
+function ac() { return audioCtx; }
+
+/* ═══════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════ */
+function renderGrid() {
+  const g = document.getElementById('sound-grid');
+  if (!sounds.length) {
+    g.innerHTML = '<div class="empty-hint"><big>No sounds yet</big>Click <b>+ Add Sound</b> or drag audio files onto this page</div>';
+    return;
+  }
+  // Remove empty hint
+  const hint = g.querySelector('.empty-hint');
+  if (hint) hint.remove();
+
+  // Add new rows
+  const existing = new Set(Array.from(g.querySelectorAll('.srow')).map(r => r.dataset.id));
+  sounds.forEach(s => {
+    if (!existing.has(String(s.id))) g.appendChild(buildRow(s));
+  });
+  // Remove deleted
+  Array.from(g.querySelectorAll('.srow')).forEach(r => {
+    if (!sounds.find(s => String(s.id) === r.dataset.id)) r.remove();
+  });
+  // Reorder DOM to match sounds array order
+  sounds.forEach(s => {
+    const row = g.querySelector(`.srow[data-id="${s.id}"]`);
+    if (row) g.appendChild(row); // moves to end in order
+  });
+}
+
+function buildRow(s) {
+  const row = document.createElement('div');
+  row.className = 'srow' + (s.isPlaying ? ' playing' : '');
+  row.dataset.id = s.id;
+  row.draggable = false; // we use custom drag on handle
+  row.innerHTML = `
+    <div class="drag-handle" data-drag="${s.id}" title="Drag to reorder">
+      <div class="dh-dot"></div><div class="dh-dot"></div><div class="dh-dot"></div>
+      <div class="dh-dot"></div><div class="dh-dot"></div><div class="dh-dot"></div>
+    </div>
+    <button class="pbtn" onclick="playSound(${s.id})">
+      <div class="progress-fill"></div>
+      <div class="picon">${s.isPlaying ? '■' : '▶'}</div>
+      <div class="cdot" style="background:${s.color}"></div>
+      <div class="sinfo">
+        <div class="sname">${esc(s.name)}</div>
+        <div class="smeta">${metaHtml(s)}</div>
+      </div>
+      <div class="vu">${'<div class="vbar"><div class="vfill"></div></div>'.repeat(5)}</div>
+    </button>
+    <button class="mbtn" onclick="toggleMenu(event,${s.id})">
+      <div class="dot3"></div><div class="dot3"></div><div class="dot3"></div>
+    </button>
+    <div class="dropdown" id="dd${s.id}"></div>`;
+
+  // Drag-to-reorder on handle
+  const handle = row.querySelector('.drag-handle');
+  handle.addEventListener('pointerdown', e => startRowDrag(e, s.id));
+
+  return row;
+}
+
+function metaHtml(s) {
+  const trimDur = s.buffer ? (s.trimEnd - s.trimStart).toFixed(1) : '0.0';
+  const isTrimmed = s.buffer && (s.trimStart > 0 || s.trimEnd < s.buffer.duration - 0.01);
+  const nextSnd = s.playNextId ? sounds.find(x => x.id === s.playNextId) : null;
+  return `<span>${trimDur}s</span>
+    ${isTrimmed ? `<span class="stag t-trim">trimmed</span>` : ''}
+    ${s.loop ? '<span class="stag t-loop">loop</span>' : ''}
+    ${(s.fadeIn > 0 || s.fadeOut > 0) ? '<span class="stag t-fade">fade</span>' : ''}
+    ${s.pitch !== 1 ? `<span class="stag t-pitch">${s.pitch.toFixed(2)}x</span>` : ''}
+    ${nextSnd ? `<span class="stag t-next">→ ${esc(nextSnd.name)}</span>` : ''}`;
+}
+
+function refreshRow(id) {
+  const s = sounds.find(x => x.id === id);
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (!s || !row) return;
+  row.className = 'srow' + (s.isPlaying ? ' playing' : '');
+  const ic = row.querySelector('.picon'); if (ic) ic.textContent = s.isPlaying ? '■' : '▶';
+  const nm = row.querySelector('.sname'); if (nm) nm.textContent = s.name;
+  const mt = row.querySelector('.smeta'); if (mt) mt.innerHTML = metaHtml(s);
+  if (!s.isPlaying) {
+    const pf = row.querySelector('.progress-fill');
+    if (pf) pf.style.width = '0%';
+    row.querySelectorAll('.vfill').forEach(b => { b.style.height = '5%'; b.style.opacity = '0.15'; });
+  }
+}
+
+/* ═══════════════════════════════════════════
+   QUEUE BANNER
+═══════════════════════════════════════════ */
+function updateQueueBanner() {
+  const el = document.getElementById('qnext-label');
+  if (!sounds.length) { el.textContent = '— no sounds loaded —'; return; }
+  // Find any playing sound that has a "play next"
+  const playing = sounds.filter(s => s.isPlaying);
+  if (playing.length) {
+    const withNext = playing.find(s => s.playNextId);
+    if (withNext) {
+      const nxt = sounds.find(x => x.id === withNext.playNextId);
+      if (nxt) { el.innerHTML = `<strong>${esc(withNext.name)}</strong> → <strong>${esc(nxt.name)}</strong>`; return; }
+    }
+    el.innerHTML = playing.map(s => `<strong>${esc(s.name)}</strong>`).join(', ') + ' playing';
+    return;
+  }
+  el.textContent = '— nothing playing —';
+}
+
+/* ═══════════════════════════════════════════
+   DROPDOWN
+═══════════════════════════════════════════ */
+function toggleMenu(e, id) {
+  e.stopPropagation();
+  const dd = document.getElementById('dd' + id);
+  const btn = e.currentTarget;
+  if (openId === id) { closeMenu(); return; }
+  closeMenu();
+  openId = id;
+  const s = sounds.find(x => x.id === id);
+  if (s) { dd.innerHTML = ddHtml(s); afterDdInsert(s); }
+  dd.classList.add('open');
+  btn.classList.add('open');
+}
+
+function closeMenu() {
+  if (openId === null) return;
+  const dd = document.getElementById('dd' + openId);
+  if (dd) dd.classList.remove('open');
+  const row = document.querySelector(`.srow[data-id="${openId}"]`);
+  if (row) { const b = row.querySelector('.mbtn'); if (b) b.classList.remove('open'); }
+  openId = null;
+}
+
+document.addEventListener('click', e => {
+  if (openId === null) return;
+  const dd = document.getElementById('dd' + openId);
+  if (!dd) return;
+  const row = document.querySelector(`.srow[data-id="${openId}"]`);
+  const mb = row && row.querySelector('.mbtn');
+  if (!dd.contains(e.target) && !(mb && mb.contains(e.target))) closeMenu();
+});
+
+function ddHtml(s) {
+  const maxFade = s.buffer ? Math.min((s.trimEnd - s.trimStart) / 2, 10).toFixed(1) : '5.0';
+  const dur = s.buffer ? s.buffer.duration : 10;
+  // Build play-next options
+  const pnOptions = sounds.filter(x => x.id !== s.id).map(x =>
+    `<option value="${x.id}" ${s.playNextId === x.id ? 'selected' : ''}>${esc(x.name)}</option>`
+  ).join('');
+
+  return `
+  <div class="ddhd">
+    <input class="dd-name" value="${esc(s.name)}" placeholder="Sound name" oninput="renameSnd(${s.id},this.value)"/>
+  </div>
+  <div class="ddbody">
+    <div class="ddr">
+      <div class="ddrh"><span class="ddlbl">Volume</span><span class="ddval" id="vvol${s.id}">${s.volume.toFixed(2)}</span></div>
+      <input class="ddsl" type="range" min="0" max="1.5" step="0.01" value="${s.volume}"
+        oninput="setProp(${s.id},'volume',+this.value);document.getElementById('vvol${s.id}').textContent=(+this.value).toFixed(2)"/>
+    </div>
+    <div class="ddr">
+      <div class="ddrh"><span class="ddlbl">Pitch / Speed</span><span class="ddval" id="vpitch${s.id}">${s.pitch.toFixed(2)}x</span></div>
+      <input class="ddsl" type="range" min="0.25" max="4" step="0.01" value="${s.pitch}"
+        oninput="setProp(${s.id},'pitch',+this.value);document.getElementById('vpitch${s.id}').textContent=(+this.value).toFixed(2)+'x';refreshRow(${s.id})"/>
+    </div>
+    <div class="ddr">
+      <div class="ddrh"><span class="ddlbl">Fade In</span><span class="ddval" id="vfi${s.id}">${s.fadeIn.toFixed(2)}s</span></div>
+      <input class="ddsl" type="range" min="0" max="${maxFade}" step="0.05" value="${s.fadeIn}"
+        oninput="setProp(${s.id},'fadeIn',+this.value);document.getElementById('vfi${s.id}').textContent=(+this.value).toFixed(2)+'s';refreshRow(${s.id})"/>
+    </div>
+    <div class="ddr">
+      <div class="ddrh"><span class="ddlbl">Fade Out</span><span class="ddval" id="vfo${s.id}">${s.fadeOut.toFixed(2)}s</span></div>
+      <input class="ddsl" type="range" min="0" max="${maxFade}" step="0.05" value="${s.fadeOut}"
+        oninput="setProp(${s.id},'fadeOut',+this.value);document.getElementById('vfo${s.id}').textContent=(+this.value).toFixed(2)+'s';refreshRow(${s.id})"/>
+    </div>
+    <div class="ddhr"></div>
+    <div class="ddr">
+      <span class="ddlbl" style="margin-bottom:6px">Trim Clip</span>
+      <div class="trim-wrap" id="trim-wrap-${s.id}">
+        <canvas class="trim-canvas" id="trim-canvas-${s.id}" height="54"></canvas>
+        <div class="trim-region" id="trim-region-${s.id}"></div>
+        <div class="trim-handle left" id="trim-left-${s.id}"></div>
+        <div class="trim-handle right" id="trim-right-${s.id}"></div>
+      </div>
+      <div class="trim-time-row">
+        <span class="trim-time" id="trim-ts-${s.id}">${s.trimStart.toFixed(2)}s</span>
+        <span class="trim-time" style="color:var(--ac);font-size:10px" id="trim-td-${s.id}">${(s.trimEnd-s.trimStart).toFixed(2)}s selected</span>
+        <span class="trim-time" id="trim-te-${s.id}">${s.trimEnd.toFixed(2)}s</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="ddfbtn" style="flex:1" onclick="resetTrim(${s.id})">Reset Trim</button>
+      </div>
+    </div>
+    <div class="ddhr"></div>
+    <div class="ddr">
+      <span class="ddlbl" style="margin-bottom:6px">Play Next</span>
+      <select class="pn-select" onchange="setPlayNext(${s.id},this.value)">
+        <option value="" ${!s.playNextId ? 'selected' : ''}>— stop after this sound —</option>
+        ${pnOptions}
+      </select>
+    </div>
+    <div class="ddhr"></div>
+    <div class="ddr">
+      <span class="ddlbl">Options</span>
+      <div class="ddtoggles">
+        <button class="ddtog lp${s.loop ? ' on' : ''}" onclick="toggleLP(${s.id},this)">⟳ Loop</button>
+      </div>
+    </div>
+  </div>
+  <div class="ddft">
+    <button class="ddfbtn fp" onclick="playSound(${s.id})">▶ Play</button>
+    <button class="ddfbtn" onclick="stopSound(${s.id})">■ Stop</button>
+    <button class="ddfbtn fd" onclick="deleteSnd(${s.id})">✕ Delete</button>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════
+   TRIM EDITOR
+═══════════════════════════════════════════ */
+function afterDdInsert(s) {
+  if (!s.buffer) return;
+  requestAnimationFrame(() => {
+    drawTrimWaveform(s);
+    setupTrimHandles(s);
+  });
+}
+
+function drawTrimWaveform(s) {
+  const canvas = document.getElementById('trim-canvas-' + s.id);
+  if (!canvas) return;
+  const W = canvas.parentElement.clientWidth || 280;
+  const H = 54;
+  canvas.width = W; canvas.height = H;
+  const ctx2 = canvas.getContext('2d');
+  const data = s.buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(data.length / W));
+  ctx2.fillStyle = '#1e1e30';
+  ctx2.fillRect(0, 0, W, H);
+  ctx2.strokeStyle = s.color + 'aa';
+  ctx2.lineWidth = 1;
+  for (let i = 0; i < W; i++) {
+    let max = 0;
+    for (let j = 0; j < step; j++) max = Math.max(max, Math.abs(data[i * step + j] || 0));
+    const yh = max * (H / 2 - 2);
+    ctx2.beginPath();
+    ctx2.moveTo(i + 0.5, H / 2 - yh);
+    ctx2.lineTo(i + 0.5, H / 2 + yh);
+    ctx2.stroke();
+  }
+  updateTrimRegion(s);
+}
+
+function updateTrimRegion(s) {
+  if (!s.buffer) return;
+  const wrap = document.getElementById('trim-wrap-' + s.id);
+  if (!wrap) return;
+  const W = wrap.clientWidth;
+  const dur = s.buffer.duration;
+  const lx = (s.trimStart / dur) * W;
+  const rx = (s.trimEnd / dur) * W;
+  const region = document.getElementById('trim-region-' + s.id);
+  const lh = document.getElementById('trim-left-' + s.id);
+  const rh = document.getElementById('trim-right-' + s.id);
+  if (region) { region.style.left = lx + 'px'; region.style.width = (rx - lx) + 'px'; }
+  if (lh) lh.style.left = (lx - 6) + 'px';
+  if (rh) rh.style.right = (W - rx - 6) + 'px';
+  const ts = document.getElementById('trim-ts-' + s.id);
+  const te = document.getElementById('trim-te-' + s.id);
+  const td = document.getElementById('trim-td-' + s.id);
+  if (ts) ts.textContent = s.trimStart.toFixed(2) + 's';
+  if (te) te.textContent = s.trimEnd.toFixed(2) + 's';
+  if (td) td.textContent = (s.trimEnd - s.trimStart).toFixed(2) + 's selected';
+}
+
+function setupTrimHandles(s) {
+  const wrap = document.getElementById('trim-wrap-' + s.id);
+  const lh = document.getElementById('trim-left-' + s.id);
+  const rh = document.getElementById('trim-right-' + s.id);
+  if (!wrap || !lh || !rh) return;
+  const dur = s.buffer.duration;
+
+  function makeDrag(handle, isLeft) {
+    handle.addEventListener('pointerdown', e => {
+      e.preventDefault(); e.stopPropagation();
+      const rect = wrap.getBoundingClientRect();
+      function move(ev) {
+        const x = Math.max(0, Math.min(ev.clientX - rect.left, rect.width));
+        const t = (x / rect.width) * dur;
+        if (isLeft) {
+          s.trimStart = Math.max(0, Math.min(t, s.trimEnd - 0.05));
+        } else {
+          s.trimEnd = Math.min(dur, Math.max(t, s.trimStart + 0.05));
+        }
+        updateTrimRegion(s);
+        refreshRow(s.id);
+      }
+      function up() { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); }
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+    });
+  }
+
+  makeDrag(lh, true);
+  makeDrag(rh, false);
+
+  // Click on waveform to set trim start (left side)
+  wrap.addEventListener('pointerdown', e => {
+    if (e.target === lh || e.target === rh) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const t = (x / rect.width) * dur;
+    const distLeft = Math.abs(t - s.trimStart);
+    const distRight = Math.abs(t - s.trimEnd);
+    if (distLeft < distRight) s.trimStart = Math.max(0, Math.min(t, s.trimEnd - 0.05));
+    else s.trimEnd = Math.min(dur, Math.max(t, s.trimStart + 0.05));
+    updateTrimRegion(s);
+    refreshRow(s.id);
+  });
+}
+
+function resetTrim(id) {
+  const s = sounds.find(x => x.id === id);
+  if (!s || !s.buffer) return;
+  s.trimStart = 0; s.trimEnd = s.buffer.duration;
+  updateTrimRegion(s);
+  refreshRow(id);
+}
+
+/* ═══════════════════════════════════════════
+   PROPS / ACTIONS
+═══════════════════════════════════════════ */
+function setProp(id, prop, val) {
+  const s = sounds.find(x => x.id === id);
+  if (!s) return;
+  s[prop] = val;
+  if (prop === 'volume' && s.gainNode) s.gainNode.gain.value = val;
+}
+
+function toggleLP(id, btn) {
+  const s = sounds.find(x => x.id === id);
+  if (!s) return;
+  s.loop = !s.loop;
+  btn.classList.toggle('on', s.loop);
+  if (s.source) s.source.loop = s.loop;
+  refreshRow(id);
+}
+
+function setPlayNext(id, val) {
+  const s = sounds.find(x => x.id === id);
+  if (!s) return;
+  s.playNextId = val ? +val : null;
+  refreshRow(id);
+  updateQueueBanner();
+}
+
+function renameSnd(id, name) {
+  const s = sounds.find(x => x.id === id);
+  if (s) { s.name = name; refreshRow(id); updateQueueBanner(); }
+}
+
+function deleteSnd(id) {
+  stopSound(id);
+  // Clear any play-next references
+  sounds.forEach(s => { if (s.playNextId === id) s.playNextId = null; });
+  sounds = sounds.filter(s => s.id !== id);
+  const row = document.querySelector(`.srow[data-id="${id}"]`);
+  if (row) row.remove();
+  if (!sounds.length) document.getElementById('sound-grid').innerHTML = '<div class="empty-hint"><big>No sounds yet</big>Click <b>+ Add Sound</b> or drag audio files onto this page</div>';
+  closeMenu();
+  updateQueueBanner();
+}
+
+/* ═══════════════════════════════════════════
+   ROW DRAG-TO-REORDER
+═══════════════════════════════════════════ */
+function startRowDrag(e, id) {
+  e.preventDefault();
+  dragSrcId = id;
+  const ghost = document.getElementById('drag-ghost');
+  const s = sounds.find(x => x.id === id);
+  ghost.textContent = s ? s.name : '';
+  ghost.style.display = 'block';
+  moveGhost(e);
+
+  const srcRow = document.querySelector(`.srow[data-id="${id}"]`);
+  if (srcRow) srcRow.classList.add('dragging');
+
+  function move(ev) {
+    moveGhost(ev);
+    // Find row under cursor (excluding ghost)
+    const els = document.elementsFromPoint(ev.clientX, ev.clientY);
+    const targetRow = els.find(el => el.classList.contains('srow') && el.dataset.id != id);
+    document.querySelectorAll('.srow').forEach(r => r.classList.remove('drag-over'));
+    if (targetRow) targetRow.classList.add('drag-over');
+  }
+
+  function up(ev) {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    ghost.style.display = 'none';
+    document.querySelectorAll('.srow').forEach(r => { r.classList.remove('dragging'); r.classList.remove('drag-over'); });
+
+    const els = document.elementsFromPoint(ev.clientX, ev.clientY);
+    const targetRow = els.find(el => el.classList.contains('srow') && el.dataset.id != id);
+    if (targetRow) {
+      const targetId = +targetRow.dataset.id;
+      const srcIdx = sounds.findIndex(s => s.id === dragSrcId);
+      const tgtIdx = sounds.findIndex(s => s.id === targetId);
+      if (srcIdx !== -1 && tgtIdx !== -1) {
+        const [moved] = sounds.splice(srcIdx, 1);
+        sounds.splice(tgtIdx, 0, moved);
+        renderGrid();
+        updateQueueBanner();
+      }
+    }
+    dragSrcId = null;
+  }
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
+
+function moveGhost(e) {
+  const g = document.getElementById('drag-ghost');
+  g.style.left = (e.clientX + 14) + 'px';
+  g.style.top = (e.clientY - 14) + 'px';
+}
+
+/* ═══════════════════════════════════════════
+   FILE DRAG & DROP
+═══════════════════════════════════════════ */
+document.addEventListener('dragover', e => {
+  e.preventDefault();
+  if (!dragSrcId) document.getElementById('dzone').classList.add('on');
+});
+document.addEventListener('dragleave', e => {
+  if (!e.relatedTarget) document.getElementById('dzone').classList.remove('on');
+});
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  document.getElementById('dzone').classList.remove('on');
+  if (dragSrcId) return; // was a row reorder, not file drop
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+  if (files.length) loadFiles(files);
+});
+
+/* ═══════════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'Escape') closeMenu();
+});
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
