@@ -233,9 +233,17 @@ const COLORS = ['#c8f060','#60f0c8','#f0b060','#f06080','#b060f0','#60b0f0','#f0
 
 function ctx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state !== 'running') audioCtx.resume();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
+
+// Unlock audio on first touch (mobile)
+document.addEventListener('touchstart', function unlockAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume().then(() => {
+    document.removeEventListener('touchstart', unlockAudio);
+  });
+}, { once: true });
 
 function mkSound(name, buffer, color, id) {
   return {
